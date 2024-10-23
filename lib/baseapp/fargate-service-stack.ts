@@ -1,95 +1,70 @@
 import * as cdk from 'aws-cdk-lib';
 import { Stack, StackProps } from 'aws-cdk-lib';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
-import * as ecsPatterns from 'aws-cdk-lib/aws-ecs-patterns';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 import { Repository } from 'aws-cdk-lib/aws-ecr';
-import { Vpc } from 'aws-cdk-lib/aws-ec2';
-import { Cluster } from 'aws-cdk-lib/aws-ecs';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import { ICluster } from 'aws-cdk-lib/aws-ecs';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as iam from 'aws-cdk-lib/aws-iam'; // Import IAM for roles
 
 export interface FargateServiceStackProps extends StackProps {
-  repository: Repository; // Optional: if you still want to pass a repository object
+  repository: Repository; // Optional if you want to pass the ECR repository object
+  cluster: ICluster;      // The ECS Cluster where the service will run
+  taskExecutionRole: iam.IRole; 
 }
 
 export class FargateServiceStack extends Stack {
-  // Expose the service object to be accessed by the pipeline
   public readonly service: ecs.FargateService;
 
   constructor(scope: Construct, id: string, props: FargateServiceStackProps) {
     super(scope, id, props);
 
-    // Import VPC, Cluster, and Public Subnets from the NetworkStack
-    const vpcId = cdk.Fn.importValue('SkillShiftVpcId');
-    const clusterName = cdk.Fn.importValue('SkillShiftClusterName');
-    const publicSubnet1Id = cdk.Fn.importValue('PublicSubnet1Id');
-    const publicSubnet2Id = cdk.Fn.importValue('PublicSubnet2Id');
-
-    // Import VPC from NetworkStack using the exported values
-    const vpc = Vpc.fromVpcAttributes(this, 'ImportedVpc', {
-      vpcId: vpcId,
-      availabilityZones: ['us-east-1a', 'us-east-1b'],  // Adjust as needed
-      publicSubnetIds: [publicSubnet1Id, publicSubnet2Id],
-    });
-
-    // Import ECS Cluster from NetworkStack
-    const cluster = Cluster.fromClusterAttributes(this, 'ImportedCluster', {
-      clusterName: clusterName,
-      vpc: vpc,
-    });
-
     // Retrieve environment variables from SSM Parameter Store
-    const apiBaseUrl = ssm.StringParameter.valueFromLookup(this, '/your-app/production/NEXT_PUBLIC_API_BASE_URL');
-    const secretKey = ssm.StringParameter.valueFromLookup(this, '/your-app/production/SECRET_KEY');
+    const apiBaseUrl = ssm.StringParameter.valueFromLookup(this, 'NEXT_PUBLIC_API_BASE_URL');
+    const secretKey = ssm.StringParameter.valueFromLookup(this, 'SECRET_KEY');
 
     // Create a unique log group for the Fargate service to store container logs
     const logGroup = new logs.LogGroup(this, `FargateServiceLogGroup-${id}`, {  
-      retention: logs.RetentionDays.ONE_WEEK,  // Customize retention as needed
+      retention: logs.RetentionDays.ONE_WEEK,  // Retain logs for one week
       removalPolicy: cdk.RemovalPolicy.DESTROY,  // Remove logs when the stack is destroyed
     });
 
-    // Define the Fargate service with CloudWatch logging enabled
-    const fargateService = new ecsPatterns.ApplicationLoadBalancedFargateService(this, `FargateService-${id}`, {
-      cluster,
-      taskImageOptions: {
-        image: ecs.ContainerImage.fromRegistry('640168451108.dkr.ecr.us-east-1.amazonaws.com/skill-shift:668f323d740369beb243f22fd87c9c9db6ab9cf8'), // Use full ECR image URI
-        containerPort: 3000, // Set the container port to 3000 for Next.js
-        environment: {
-          NEXT_PUBLIC_API_BASE_URL: apiBaseUrl,
-          SECRET_KEY: secretKey,
-        },
-        // Enable CloudWatch Logs for the container
-        logDriver: new ecs.AwsLogDriver({
-          streamPrefix: 'FargateService',
-          logGroup: logGroup,  // Attach the log group to the container
-        }),
-      },
-      desiredCount: 1,
-      publicLoadBalancer: true,  // Make the load balancer publicly accessible
-      listenerPort: 80, // The load balancer listens on port 80 and routes to container port 3000
-      healthCheckGracePeriod: cdk.Duration.seconds(60), // Give service some time to start up
+    // Define the Fargate task definition
+    const taskDefinition = new ecs.FargateTaskDefinition(this, `FargateTaskDefinition-${id}`, {
+      memoryLimitMiB: 512,  // Adjust memory as needed
+      cpu: 256,  // Adjust CPU as needed
+      executionRole: props.taskExecutionRole,
+      taskRole: props.taskExecutionRole
     });
 
-    // Add Health Check for the Load Balancer
-    fargateService.targetGroup.configureHealthCheck({
-      path: '/api/health',  // Path to your health check endpoint in Next.js
-      interval: cdk.Duration.seconds(30),
-      timeout: cdk.Duration.seconds(5),
-      healthyHttpCodes: '200',  // Consider 200 as healthy
-      healthyThresholdCount: 2,
-      unhealthyThresholdCount: 5,
+    // Add the container to the task
+    taskDefinition.addContainer('AppContainer', {
+      image: ecs.ContainerImage.fromRegistry('640168451108.dkr.ecr.us-east-1.amazonaws.com/skill-shift:latest'), // Full ECR image URI
+      environment: {
+        NEXT_PUBLIC_API_BASE_URL: apiBaseUrl,
+        SECRET_KEY: secretKey,
+      },
+      logging: new ecs.AwsLogDriver({
+        streamPrefix: 'FargateService',  // Log stream prefix in CloudWatch
+        logGroup: logGroup,  // Log group created earlier
+      }),
+      portMappings: [{ containerPort: 3000 }]  // Map container port for your application
+    });
+
+    // Create Fargate service without a load balancer
+    const fargateService = new ecs.FargateService(this, `FargateService-${id}`, {
+      cluster: props.cluster,  // ECS Cluster
+      taskDefinition,  // Fargate task definition
+      desiredCount: 1,  // Number of tasks to run
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },  // Use public subnets
     });
 
     // Assign the Fargate service to the public property
-    this.service = fargateService.service; // This will allow us to use the service in the pipeline
+    this.service = fargateService;
 
-    // Output the Fargate service information for debugging purposes
-    new cdk.CfnOutput(this, 'FargateServiceDNS', {
-      value: fargateService.loadBalancer.loadBalancerDnsName,
-      description: 'DNS name of the Load Balancer',
-    });
-
+    // Output the CloudWatch Log Group name for debugging purposes
     new cdk.CfnOutput(this, 'FargateServiceLogGroup', {
       value: logGroup.logGroupName,
       description: 'CloudWatch Log Group for Fargate Service',

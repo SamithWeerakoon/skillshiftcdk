@@ -9,12 +9,12 @@ export class SsmParametersStack extends Stack {
 
     // Store environment variables in SSM Parameter Store
     new StringParameter(this, 'ApiBaseUrl', {
-      parameterName: '/your-app/production/NEXT_PUBLIC_API_BASE_URL',
+      parameterName: 'NEXT_PUBLIC_API_BASE_URL',
       stringValue: 'https://api.example.com',
     });
 
     new StringParameter(this, 'SecretKey', {
-      parameterName: '/your-app/production/SECRET_KEY',
+      parameterName: 'SECRET_KEY',
       stringValue: 'my-secret-key',
     });
   }

@@ -4,6 +4,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 export class IamStack extends Stack {
+  public readonly ecsTaskExecutionRole: iam.Role;
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
@@ -99,12 +100,12 @@ export class IamStack extends Stack {
     );
 
     // Allow CodePipeline and CodeBuild to retrieve GitHub token from Secrets Manager
-    const secretArn = 'arn:aws:secretsmanager:us-east-1:967083126936:secret:skillshift-yTrlCf';
+    const secretArn = 'arn:aws:secretsmanager:us-east-1:640168451108:secret:skillshift-FwpAfj';
 
     const pipelineRole = new iam.Role(this, 'CodePipelineRole', {
       assumedBy: new iam.ServicePrincipal('codepipeline.amazonaws.com'),
     });
-    
+
     // Add Secrets Manager access policy for GitHub token
     pipelineRole.addToPolicy(new iam.PolicyStatement({
       actions: ['secretsmanager:GetSecretValue'],
@@ -119,6 +120,50 @@ export class IamStack extends Stack {
     codeBuildRole.addToPolicy(new iam.PolicyStatement({
       actions: ['secretsmanager:GetSecretValue'],
       resources: [secretArn],
+    }));
+
+
+    // Add necessary ECR permissions to CodeBuild Role
+    codeBuildRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'ecr:GetAuthorizationToken',          // For authentication with ECR
+          'ecr:BatchCheckLayerAvailability',    // Check the availability of image layers
+          'ecr:GetDownloadUrlForLayer',         // Download image layers
+          'ecr:BatchGetImage',                  // Get image details
+          'ecr:PutImage',                       // Push image to ECR
+          'ecr:InitiateLayerUpload',            // Start uploading Docker layers
+          'ecr:UploadLayerPart',                // Upload layer parts
+          'ecr:CompleteLayerUpload',            // Complete Docker layer upload
+          'ecr:ListImages'
+        ],
+        resources: ['*'], // Allow access to all ECR repositories
+      })
+    );
+
+    // ECS Task Execution Role for pulling images, networking, and logging
+    this.ecsTaskExecutionRole= new iam.Role(this, 'SMTaskExecutionRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+      description: 'IAM Role for ECS tasks to interact with AWS services',
+      roleName: 'SMTaskExecutionRole',
+    });
+
+    // Managed policy for ECR access
+    this.ecsTaskExecutionRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'));
+
+    // Add networking and logging permissions
+    this.ecsTaskExecutionRole.addToPolicy(new iam.PolicyStatement({
+      actions: [
+        'ec2:CreateNetworkInterface',
+        'ec2:DescribeNetworkInterfaces',
+        'ec2:DeleteNetworkInterface',
+        'ec2:DescribeSecurityGroups',
+        'ec2:DescribeSubnets',
+        'ec2:DescribeVpcs',
+        'logs:CreateLogStream',
+        'logs:PutLogEvents',
+      ],
+      resources: ['*'],
     }));
 
     // Output the ECS Task Role ARN for easy reference

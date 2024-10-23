@@ -5,9 +5,10 @@ import { EcrStack } from '../lib/baseapp/ecr-stack';
 import { SsmParametersStack } from '../lib/baseapp/ssm-parameters-stack';
 import { FargateServiceStack } from '../lib/baseapp/fargate-service-stack';
 import { PipelineStack } from '../lib/baseapp/pipeline-stack';
-import { IamStack } from '../lib/baseapp/iam-stack';
 import { KeycloakFargateStack } from '../lib/baseapp/KeycloakFargateStack';
-import { NetworkStack } from '../lib/baseapp/NetworkStack';
+import { NetworkStack } from '../lib/baseapp/network';
+import { ClusterStack } from '../lib/baseapp/cluster';
+import { IamStack } from '../lib/baseapp/iam-stack';
 // Define environment configuration for your AWS account and region
 // const env = {
 //   account: process.env.CDK_DEFAULT_ACCOUNT,  // Automatically fetch account from environment
@@ -38,18 +39,33 @@ new PipelineStack(app, 'PipelineStack', {
 });
 
 // Optionally, if you have an IAM stack for managing permissions
-new IamStack(app, 'IamStack', { env });
+const ecsTaskExecutionRole = new IamStack(app, 'IamStack', { env });
 
-const networkStack = new NetworkStack(app, 'NetworkStack');
+// const networkStack = new NetworkStack(app, 'NetworkStack');
 
-// Pass the VPC and Cluster to the Keycloak Fargate stack
-new KeycloakFargateStack(app, 'KeycloakFargateStack', {
+const networkStack = new NetworkStack(
+  app,
+  'NetworkStack',{
+    stackProps: { env }}
+);
+
+const clusterStack = new ClusterStack(app, 'skillappClusterStack', {
+  stackProps: { env },
   vpc: networkStack.vpc,
-  cluster: networkStack.cluster,
 });
+
+// // Pass the VPC and Cluster to the Keycloak Fargate stack
+// new KeycloakFargateStack(app, 'KeycloakFargateStack', {
+//   vpc: networkStack.vpc,
+//   cluster: networkStack.cluster,
+// });
+
+const ecs= ecsTaskExecutionRole.ecsTaskExecutionRole.withoutPolicyUpdates();
 
 // Instantiate Fargate Service Stack with environment configuration
 const fargateServiceStack = new FargateServiceStack(app, 'FargateServiceStack', {
   repository: ecrStack.repository,
+  cluster : clusterStack.cluster,
+  taskExecutionRole: ecs,
   env, // Pass environment configuration here
 });

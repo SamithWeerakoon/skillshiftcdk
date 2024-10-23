@@ -50,7 +50,7 @@ export class PipelineStack extends Stack {
           actionName: 'GitHub_Source',
           owner: 'SamithWeerakoon',       // GitHub username
           repo: 'skillshiftapp',           // Repository name
-          connectionArn: 'arn:aws:codeconnections:us-east-1:967083126936:connection/7ccf376b-2d7e-443b-97a4-b5b21362a218', // Use your existing CodeStar connection ARN
+          connectionArn: 'arn:aws:codeconnections:us-east-1:640168451108:connection/922e934a-c857-41b6-a3af-ed8e48bef72f', // Use your existing CodeStar connection ARN
           output: sourceOutput,
           branch: 'main',                  // Branch to track
         }),
