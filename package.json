@@ -8,16 +8,21 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "clean": "rimraf \"**/*.js\" \"**/*.js.map\""
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/node": "20.14.9",
     "aws-cdk": "2.156.0",
     "jest": "^29.7.0",
+    "rimraf": "^6.0.1",
     "ts-jest": "^29.1.5",
     "ts-node": "^10.9.2",
-    "typescript": "~5.5.3"
+    "typescript": "~5.5.3",
+    "next": "^14.3.0",       
+    "react": "^18.3.0",       
+    "react-dom": "^18.3.0"  
   },
   "dependencies": {
     "@aws-cdk/aws-codebuild": "^1.203.0",
@@ -27,8 +32,16 @@
     "@aws-cdk/aws-ecs": "^1.203.0",
     "@aws-cdk/aws-iam": "^1.203.0",
     "@aws-cdk/aws-ssm": "^1.203.0",
-    "aws-cdk-lib": "2.156.0",
-    "constructs": "^10.0.0",
-    "source-map-support": "^0.5.21"
+    "aws-cdk-lib": "^2.156.0",
+    "constructs": "^10.4.2",
+    "source-map-support": "^0.5.21",
+    "@types/node": "^20.8.0",  
+    "@types/react": "^18.2.0", 
+    "@types/react-dom": "^18.2.0",
+    "eslint": "^8.52.0",    
+    "eslint-config-next": "14.3.0",
+    "postcss": "^8.4.26",     
+    "tailwindcss": "^3.4.10",  
+    "typescript": "^5.3.0"    
   }
 }

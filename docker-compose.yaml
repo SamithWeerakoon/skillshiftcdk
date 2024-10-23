@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  web:
+    image: skillapp:skillapp
+    container_name: your-app-container
+    platform: linux/amd64   # Explicitly specify the platform to avoid platform mismatch
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: "https://api.example.com"
+      SECRET_KEY: "your-secret-key"

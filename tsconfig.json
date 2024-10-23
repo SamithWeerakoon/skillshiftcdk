@@ -22,10 +22,20 @@
     "strictPropertyInitialization": false,
     "typeRoots": [
       "./node_modules/@types"
-    ]
+    ],
+    "outDir": "./",                  // Output directory (root directory)
+    "rootDir": "./",                 // Set the root directory for input files
+    "noEmitOnError": true,           // Prevent emitting files if there are TypeScript errors
+    "esModuleInterop": true,         // Enables emit of additional helper for ES module default imports
+    "skipLibCheck": true             // Skip type checking of declaration files
+  
   },
   "exclude": [
     "node_modules",
-    "cdk.out"
-  ]
+    "cdk.out",
+     "dist" 
+  ],
+  "include": [
+    "**/*.ts"                         // Include all TypeScript files in the current directory and subdirectories
+  ],
 }

@@ -8,5 +8,7 @@
     "us-east-1f"
   ],
   "ssm:account=967083126936:parameterName=/your-app/production/NEXT_PUBLIC_API_BASE_URL:region=us-east-1": "https://api.example.com",
-  "ssm:account=967083126936:parameterName=/your-app/production/SECRET_KEY:region=us-east-1": "my-secret-key"
+  "ssm:account=967083126936:parameterName=/your-app/production/SECRET_KEY:region=us-east-1": "my-secret-key",
+  "ssm:account=640168451108:parameterName=/your-app/production/NEXT_PUBLIC_API_BASE_URL:region=us-east-1": "https://api.example.com",
+  "ssm:account=640168451108:parameterName=/your-app/production/SECRET_KEY:region=us-east-1": "my-secret-key"
 }

@@ -7,14 +7,16 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
+interface KeycloakFargateStackProps extends cdk.StackProps {
+  vpc: ec2.IVpc;
+  cluster: ecs.Cluster;
+}
+
 export class KeycloakFargateStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: KeycloakFargateStackProps) {
     super(scope, id, props);
 
-    // VPC
-    const vpc = new ec2.Vpc(this, 'KeycloakVpc', {
-      maxAzs: 2
-    });
+    const { vpc, cluster } = props;  // Access vpc and cluster from props
 
     // MySQL Credentials stored in Secrets Manager
     const dbCredentials = new secretsmanager.Secret(this, 'DBCredentials', {
@@ -43,13 +45,22 @@ export class KeycloakFargateStack extends cdk.Stack {
       publiclyAccessible: true,
     });
 
-    // Fargate Cluster
-    const cluster = new ecs.Cluster(this, 'KeycloakCluster', {
-      vpc,
+    // Define IAM Role for the Fargate Task
+    const taskRole = new iam.Role(this, 'KeycloakTaskRole', {
+      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
 
-    // Fargate Task Definition for Keycloak
-    const taskDefinition = new ecs.FargateTaskDefinition(this, 'KeycloakTaskDef');
+    // Attach necessary policies to the IAM role
+    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'));
+    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonRDSFullAccess'));
+    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryFullAccess'));
+    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsFullAccess'));
+    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite'));
+
+    // Fargate Task Definition for Keycloak with taskRole attached
+    const taskDefinition = new ecs.FargateTaskDefinition(this, 'KeycloakTaskDef', {
+      taskRole, // Assign the role here during creation
+    });
 
     // Add container for Keycloak
     const keycloakContainer = taskDefinition.addContainer('KeycloakContainer', {
@@ -58,13 +69,16 @@ export class KeycloakFargateStack extends cdk.Stack {
       environment: {
         'KC_DB': 'mysql',
         'KC_DB_URL': `jdbc:mysql://${mysql.dbInstanceEndpointAddress}/keycloak`,
-        'KC_DB_USERNAME': dbCredentials.secretValueFromJson('username').toString(),
-        'KC_DB_PASSWORD': dbCredentials.secretValueFromJson('password').toString(),
         'KC_HTTP_PORT': '8080',
         'KC_HOSTNAME': 'localhost',
         'KEYCLOAK_ADMIN': 'admin',
         'KEYCLOAK_ADMIN_PASSWORD': 'admin',
         'KC_FEATURES': 'scripts',
+      },
+      secrets: {
+        // Pass secrets securely using Secrets Manager
+        'KC_DB_USERNAME': ecs.Secret.fromSecretsManager(dbCredentials, 'username'),
+        'KC_DB_PASSWORD': ecs.Secret.fromSecretsManager(dbCredentials, 'password'),
       },
       portMappings: [{ containerPort: 8080 }]
     });
@@ -80,32 +94,6 @@ export class KeycloakFargateStack extends cdk.Stack {
 
     // Grant RDS permissions
     mysql.grantConnect(fargateService.taskDefinition.taskRole);
-
-    // Define IAM Role for the Fargate Task
-    const taskRole = new iam.Role(this, 'KeycloakTaskRole', {
-      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
-    });
-
-    // Attach necessary policies to the IAM role
-    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'));
-    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonRDSFullAccess'));
-    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryFullAccess'));
-    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('CloudWatchLogsFullAccess'));
-    taskRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite'));
-
-    // Attach the IAM role to the task definition
-    taskDefinition.addToTaskRolePolicy(new iam.PolicyStatement({
-      actions: [
-        'secretsmanager:GetSecretValue',
-        'rds-db:connect',
-        'logs:CreateLogStream',
-        'logs:PutLogEvents',
-      ],
-      resources: [dbCredentials.secretArn, mysql.instanceArn],
-    }));
-
-    // Assign taskRole to the taskDefinition
-    taskDefinition.taskRole = taskRole;
 
     // Allow the ECS task to pull from ECR
     taskDefinition.addToTaskRolePolicy(new iam.PolicyStatement({
