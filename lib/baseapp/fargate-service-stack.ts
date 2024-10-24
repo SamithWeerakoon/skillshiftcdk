@@ -36,7 +36,7 @@ export class FargateServiceStack extends Stack {
       memoryLimitMiB: 512,  // Adjust memory as needed
       cpu: 256,  // Adjust CPU as needed
       executionRole: props.taskExecutionRole,
-      taskRole: props.taskExecutionRole
+      taskRole: props.taskExecutionRole,
     });
 
     // Add the container to the task
@@ -53,12 +53,11 @@ export class FargateServiceStack extends Stack {
       portMappings: [{ containerPort: 3000 }]  // Map container port for your application
     });
 
-    // Create Fargate service without a load balancer
+    // Create Fargate service with private subnets (no public exposure)
     const fargateService = new ecs.FargateService(this, `FargateService-${id}`, {
       cluster: props.cluster,  // ECS Cluster
       taskDefinition,  // Fargate task definition
       desiredCount: 1,  // Number of tasks to run
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },  // Use public subnets
     });
 
     // Assign the Fargate service to the public property

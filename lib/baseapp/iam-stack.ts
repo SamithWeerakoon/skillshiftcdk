@@ -60,6 +60,7 @@ export class IamStack extends Stack {
           'ec2:DescribeSubnets',
           'ec2:DescribeVpcs',
           'ecr:GetAuthorizationToken',
+
         ],
         resources: ['*'],
       })
@@ -142,7 +143,7 @@ export class IamStack extends Stack {
     );
 
     // ECS Task Execution Role for pulling images, networking, and logging
-    this.ecsTaskExecutionRole= new iam.Role(this, 'SMTaskExecutionRole', {
+    this.ecsTaskExecutionRole = new iam.Role(this, 'SMTaskExecutionRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       description: 'IAM Role for ECS tasks to interact with AWS services',
       roleName: 'SMTaskExecutionRole',
@@ -151,9 +152,17 @@ export class IamStack extends Stack {
     // Managed policy for ECR access
     this.ecsTaskExecutionRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'));
 
-    // Add networking and logging permissions
     this.ecsTaskExecutionRole.addToPolicy(new iam.PolicyStatement({
       actions: [
+        'ecr:GetAuthorizationToken',          // For authentication with ECR
+        'ecr:BatchCheckLayerAvailability',    // Check the availability of image layers
+        'ecr:GetDownloadUrlForLayer',         // Download image layers
+        'ecr:BatchGetImage',                  // Get image details
+        'ecr:PutImage',                       // Push image to ECR
+        'ecr:InitiateLayerUpload',            // Start uploading Docker layers
+        'ecr:UploadLayerPart',                // Upload layer parts
+        'ecr:CompleteLayerUpload',            // Complete Docker layer upload
+        'ecr:ListImages',
         'ec2:CreateNetworkInterface',
         'ec2:DescribeNetworkInterfaces',
         'ec2:DeleteNetworkInterface',
@@ -162,6 +171,35 @@ export class IamStack extends Stack {
         'ec2:DescribeVpcs',
         'logs:CreateLogStream',
         'logs:PutLogEvents',
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        'logs:CreateLogStream',
+        'logs:PutLogEvents',
+        'logs:DescribeLogStreams',
+        'logs:GetLogEvents',
+        'logs:FilterLogEvents',
+        'elasticloadbalancing:DescribeLoadBalancers',
+        'elasticloadbalancing:DescribeTargetGroups',
+        'elasticloadbalancing:RegisterTargets',
+        'elasticloadbalancing:DeregisterTargets',
+        'elasticloadbalancing:DescribeTargetHealth', 
+        's3:PutObject', 
+        's3:GetObject', 
+        's3:ListBucket', 
+        's3:DeleteObject',
+        'cloudformation:CreateStack',
+        'cloudformation:DeleteStack',
+        'cloudformation:DescribeStacks',
+        'cloudformation:UpdateStack',
+        'ec2:CreateNetworkInterface',
+        'ec2:DeleteNetworkInterface',
+        'ec2:DescribeNetworkInterfaces',
+        'ec2:DescribeSecurityGroups',
+        'ec2:DescribeSubnets',
+        'ec2:DescribeVpcs',
+        'ecr:GetAuthorizationToken',
       ],
       resources: ['*'],
     }));
