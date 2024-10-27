@@ -9,6 +9,7 @@ import { KeycloakFargateStack } from '../lib/baseapp/KeycloakFargateStack';
 import { NetworkStack } from '../lib/baseapp/network';
 import { ClusterStack } from '../lib/baseapp/cluster';
 import { IamStack } from '../lib/baseapp/iam-stack';
+import { KeycloakServiceStack } from '../lib/baseapp/keycloak-service-stack';
 // Define environment configuration for your AWS account and region
 // const env = {
 //   account: process.env.CDK_DEFAULT_ACCOUNT,  // Automatically fetch account from environment
@@ -67,5 +68,13 @@ const fargateServiceStack = new FargateServiceStack(app, 'FargateServiceStack', 
   repository: ecrStack.repository,
   cluster : clusterStack.cluster,
   taskExecutionRole: ecs,
-  env, // Pass environment configuration here
+  env,
+});
+
+
+const keycloakServiceStack = new KeycloakServiceStack(app, 'KeycloakServiceStack', {
+  repository: ecrStack.repository,
+  cluster : clusterStack.cluster,
+  taskExecutionRole: ecs,
+  env,
 });

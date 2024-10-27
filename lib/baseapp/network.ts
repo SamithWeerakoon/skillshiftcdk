@@ -19,7 +19,7 @@ export class NetworkStack extends cdk.Stack {
 
     // Create a VPC with minimal resources (1 AZ, 1 NAT gateway)
     this.#vpc = new ec2.Vpc(this, 'Vpc', {
-      maxAzs: 1,  // Limit to a single availability zone
+      maxAzs: 2,  // Limit to a single availability zone
       natGateways: 1,  // Only one NAT gateway for private subnet
       subnetConfiguration: this.createSubnetConfigurations(),  // Define public/private subnets
     });
